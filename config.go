@@ -1,9 +1,8 @@
 package zabbixreceiver
 
-import "go.opentelemetry.io/collector/config"
+import "go.opentelemetry.io/collector/component"
 
-// Config defines configuration for the Zabbix receiver.
 type Config struct {
-	config.ReceiverSettings `mapstructure:",squash"`
-	Endpoint                string `mapstructure:"endpoint"`
+	component.Config
+	Endpoint string `mapstructure:"endpoint"`
 }
