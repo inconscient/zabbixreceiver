@@ -20,7 +20,7 @@ type zabbixReceiver struct {
 
 func createMetricsReceiver(
 	_ context.Context,
-	_ receiver.CreateSettings,
+	_ receiver.Settings,
 	cfg component.Config,
 	nextConsumer consumer.Metrics,
 ) (receiver.Metrics, error) {
@@ -62,8 +62,8 @@ func (zr *zabbixReceiver) handleConnection(conn net.Conn) {
 			return
 		}
 
-		md := pmetric.NewMetrics()
-		rm := md.ResourceMetrics().AppendEmpty()
+		metrics := pmetric.NewMetrics()
+		rm := metrics.ResourceMetrics().AppendEmpty()
 		rm.Resource().Attributes().PutString("host", msg.Host)
 
 		sm := rm.ScopeMetrics().AppendEmpty()
@@ -71,9 +71,9 @@ func (zr *zabbixReceiver) handleConnection(conn net.Conn) {
 		m.SetName(msg.Key)
 		dp := m.SetEmptyGauge().DataPoints().AppendEmpty()
 		dp.SetIntValue(parseInt(msg.Value))
-		dp.SetTimestamp(uint64(time.Unix(msg.Timestamp, 0).UnixNano()))
+		dp.SetTimestamp(pmetric.NewTimestampFromTime(time.Unix(msg.Timestamp, 0)))
 
-		_ = zr.consumer.ConsumeMetrics(context.Background(), md)
+		_ = zr.consumer.ConsumeMetrics(context.Background(), metrics)
 	}
 }
 
