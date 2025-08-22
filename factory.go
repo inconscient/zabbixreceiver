@@ -2,28 +2,24 @@ package zabbixreceiver
 
 import (
 	"go.opentelemetry.io/collector/component"
-	"go.opentelemetry.io/collector/config"
-	"go.opentelemetry.io/collector/receiver/receiverhelper"
+	"go.opentelemetry.io/collector/receiver"
 )
 
 const (
 	typeStr = "zabbixreceiver"
 )
 
-func NewFactory() component.ReceiverFactory {
-	return receiverhelper.NewFactory(
-		typeStr,
+func NewFactory() receiver.Factory {
+	return receiver.NewFactory(
+		component.MustNewType(typeStr),
 		createDefaultConfig,
-		receiverhelper.WithMetrics(createMetricsReceiver),
+		receiver.WithMetrics(createMetricsReceiver, component.StabilityLevelDevelopment),
 	)
 }
 
 func createDefaultConfig() component.Config {
 	return &Config{
-		ReceiverSettings: config.ReceiverSettings{
-			TypeVal: typeStr,
-			NameVal: typeStr,
-		},
-		Endpoint: ":10051",
+		ReceiverSettings: config.NewReceiverSettings(component.NewID(typeStr)),
+		Endpoint:         ":10051",
 	}
 }
