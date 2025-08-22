@@ -9,7 +9,8 @@ import (
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
-	"go.opentelemetry.io/collector/pdata"
+	"go.opentelemetry.io/collector/pdata/pmetric"
+	"go.opentelemetry.io/collector/receiver"
 )
 
 type zabbixReceiver struct {
@@ -61,8 +62,8 @@ func (zr *zabbixReceiver) handleConnection(conn net.Conn) {
 			return
 		}
 
-		metrics := xpdata.NewMetrics()
-		rm := metrics.ResourceMetrics().AppendEmpty()
+		md := pmetric.NewMetrics()
+		rm := md.ResourceMetrics().AppendEmpty()
 		rm.Resource().Attributes().PutString("host", msg.Host)
 
 		sm := rm.ScopeMetrics().AppendEmpty()
@@ -70,9 +71,9 @@ func (zr *zabbixReceiver) handleConnection(conn net.Conn) {
 		m.SetName(msg.Key)
 		dp := m.SetEmptyGauge().DataPoints().AppendEmpty()
 		dp.SetIntValue(parseInt(msg.Value))
-		dp.SetTimestamp(xpdata.NewTimestampFromTime(time.Unix(msg.Timestamp, 0)))
+		dp.SetTimestamp(uint64(time.Unix(msg.Timestamp, 0).UnixNano()))
 
-		_ = zr.consumer.ConsumeMetrics(context.Background(), metrics)
+		_ = zr.consumer.ConsumeMetrics(context.Background(), md)
 	}
 }
 
