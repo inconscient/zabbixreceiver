@@ -64,14 +64,14 @@ func (zr *zabbixReceiver) handleConnection(conn net.Conn) {
 
 		metrics := pmetric.NewMetrics()
 		rm := metrics.ResourceMetrics().AppendEmpty()
-		rm.Resource().Attributes().PutString("host", msg.Host)
+		rm.Resource().Attributes().UpsertString("host", msg.Host)
 
 		sm := rm.ScopeMetrics().AppendEmpty()
 		m := sm.Metrics().AppendEmpty()
 		m.SetName(msg.Key)
 		dp := m.SetEmptyGauge().DataPoints().AppendEmpty()
 		dp.SetIntValue(parseInt(msg.Value))
-		dp.SetTimestamp(pmetric.NewTimestampFromTime(time.Unix(msg.Timestamp, 0)))
+		dp.SetTimestamp(pmetric.NewTimestamp(time.Unix(msg.Timestamp, 0).UnixNano()))
 
 		_ = zr.consumer.ConsumeMetrics(context.Background(), metrics)
 	}
