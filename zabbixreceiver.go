@@ -1,17 +1,15 @@
 package zabbixreceiver
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
-	"fmt"
 	"net"
 	"strconv"
+	"time"
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
-	"go.opentelemetry.io/collector/otelcol/metricdata"
-	"go.opentelemetry.io/collector/receiver"
+	"go.opentelemetry.io/collector/xpdata"
 )
 
 type zabbixReceiver struct {
@@ -25,9 +23,8 @@ func createMetricsReceiver(
 	cfg component.Config,
 	nextConsumer consumer.Metrics,
 ) (receiver.Metrics, error) {
-	rCfg := cfg.(*Config)
 	return &zabbixReceiver{
-		cfg:      rCfg,
+		cfg:      cfg.(*Config),
 		consumer: nextConsumer,
 	}, nil
 }
@@ -35,7 +32,7 @@ func createMetricsReceiver(
 func (zr *zabbixReceiver) Start(_ context.Context, _ component.Host) error {
 	ln, err := net.Listen("tcp", zr.cfg.Endpoint)
 	if err != nil {
-		return fmt.Errorf("failed to listen on %s: %w", zr.cfg.Endpoint, err)
+		return err
 	}
 
 	go func() {
@@ -47,7 +44,6 @@ func (zr *zabbixReceiver) Start(_ context.Context, _ component.Host) error {
 			go zr.handleConnection(conn)
 		}
 	}()
-
 	return nil
 }
 
@@ -57,24 +53,27 @@ func (zr *zabbixReceiver) Shutdown(_ context.Context) error {
 
 func (zr *zabbixReceiver) handleConnection(conn net.Conn) {
 	defer conn.Close()
-	scanner := bufio.NewScanner(conn)
+	decoder := json.NewDecoder(conn)
 
-	for scanner.Scan() {
-		line := scanner.Text()
+	for {
 		var msg ZabbixMessage
-		if err := json.Unmarshal([]byte(line), &msg); err != nil {
-			continue
+		if err := decoder.Decode(&msg); err != nil {
+			return
 		}
 
-		metrics := zr.convertToMetrics(msg)
+		metrics := xpdata.NewMetrics()
+		rm := metrics.ResourceMetrics().AppendEmpty()
+		rm.Resource().Attributes().PutString("host", msg.Host)
+
+		sm := rm.ScopeMetrics().AppendEmpty()
+		m := sm.Metrics().AppendEmpty()
+		m.SetName(msg.Key)
+		dp := m.SetEmptyGauge().DataPoints().AppendEmpty()
+		dp.SetIntValue(parseInt(msg.Value))
+		dp.SetTimestamp(xpdata.NewTimestampFromTime(time.Unix(msg.Timestamp, 0)))
+
 		_ = zr.consumer.ConsumeMetrics(context.Background(), metrics)
 	}
-}
-
-func (zr *zabbixReceiver) convertToMetrics(msg ZabbixMessage) metricdata.ResourceMetrics {
-	// You will need to use the new metricdata API to construct metrics
-	// This is a placeholder for actual metric construction
-	return metricdata.ResourceMetrics{}
 }
 
 func parseInt(val string) int64 {

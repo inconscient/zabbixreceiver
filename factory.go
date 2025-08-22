@@ -11,11 +11,8 @@ func NewFactory() receiver.Factory {
 	return receiver.NewFactory(
 		component.MustNewType(typeStr),
 		func() component.Config {
-			return &Config{
-				Config:   component.NewDefaultConfig(component.MustNewType(typeStr)),
-				Endpoint: ":10051",
-			}
+			return &Config{Endpoint: ":10051"}
 		},
-		receiver.WithMetrics(createMetricsReceiver, component.StabilityLevelDevelopment),
+		receiver.WithMetrics(createMetricsReceiver, component.StabilityLevelAlpha),
 	)
 }
