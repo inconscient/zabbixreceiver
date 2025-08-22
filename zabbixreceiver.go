@@ -65,7 +65,7 @@ func (zr *zabbixReceiver) handleConnection(conn net.Conn) {
 
 		metrics := pmetric.NewMetrics()
 		rm := metrics.ResourceMetrics().AppendEmpty()
-		rm.Resource().Attributes().InsertString("host", msg.Host)
+		rm.Resource().Attributes().UpsertString("host", msg.Host)
 
 		sm := rm.ScopeMetrics().AppendEmpty()
 		m := sm.Metrics().AppendEmpty()
