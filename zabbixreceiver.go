@@ -3,6 +3,7 @@ package zabbixreceiver
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net"
 	"strconv"
 	"time"
@@ -46,6 +47,10 @@ func (zr *zabbixReceiver) Start(_ context.Context, _ component.Host) error {
 			go zr.handleConnection(conn)
 		}
 	}()
+
+	// Log successful start to console
+	log.Printf("zabbixreceiver started and listening on %s", zr.cfg.Endpoint)
+
 	return nil
 }
 
