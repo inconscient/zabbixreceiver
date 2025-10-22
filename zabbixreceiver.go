@@ -68,6 +68,9 @@ func (zr *zabbixReceiver) handleConnection(conn net.Conn) {
 			return
 		}
 
+		// Log message received to console
+		log.Printf("received message from host: %s", msg.Host)
+
 		metrics := pmetric.NewMetrics()
 		rm := metrics.ResourceMetrics().AppendEmpty()
 		rm.Resource().Attributes().PutStr("host", msg.Host)
