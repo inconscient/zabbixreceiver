@@ -22,7 +22,7 @@ type zabbixReceiver struct {
 
 func createMetricsReceiver(
 	_ context.Context,
-	_ receiver.Settings,
+	set receiver.Settings,
 	cfg component.Config,
 	nextConsumer consumer.Metrics,
 ) (receiver.Metrics, error) {
@@ -77,7 +77,7 @@ func (zr *zabbixReceiver) handleConnection(conn net.Conn) {
 		m.SetName(msg.Key)
 		dp := m.SetEmptyGauge().DataPoints().AppendEmpty()
 		dp.SetIntValue(parseInt(msg.Value))
-		dp.SetTimestamp(pcommon.NewTimestampFromTime(time.Unix(msg.Timestamp, 0)))
+		dp.SetTimestamp(pcommon.Timestamp(time.Unix(msg.Timestamp, 0).UnixNano()))
 
 		_ = zr.consumer.ConsumeMetrics(context.Background(), metrics)
 	}
