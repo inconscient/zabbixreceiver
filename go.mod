@@ -8,7 +8,7 @@ require (
 	go.opentelemetry.io/collector/component v1.44.0
 	go.opentelemetry.io/collector/consumer v1.44.0
 	go.opentelemetry.io/collector/pdata v1.44.0
-	go.opentelemetry.io/collector/receiver v1.44.0
+	go.opentelemetry.io/collector/receiver v1.44.0 
 )
 
 require (
