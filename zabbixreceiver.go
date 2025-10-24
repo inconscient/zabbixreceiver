@@ -2,6 +2,7 @@ package zabbixreceiver
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net"
 	"strconv"
@@ -59,27 +60,45 @@ func (zr *zabbixReceiver) Shutdown(_ context.Context) error {
 
 func (zr *zabbixReceiver) handleConnection(conn net.Conn) {
 	defer conn.Close()
-	decoder := json.NewDecoder(conn)
+
+	// Read response
+	buffer := make([]byte, 1024)
+	n, err := conn.Read(buffer)
+	if err != nil {
+		log.Println("Error reading from connection:", err)
+		return
+	}
+
+	log.Println("Received Message:", string(buffer[:n]))
+
+	//decoder := json.NewDecoder(conn)
 
 	for {
-		var msg ZabbixMessage
-		if err := decoder.Decode(&msg); err != nil {
+		var msg Metric
+		var msgbd string = string(buffer[:n])
+		log.Printf("message: %s", msgbd)
+
+		//if err := decoder.Decode(&msg); err != nil {
+		if err := json.Unmarshal(buffer[:n], &msg); err != nil {
+			// Log message error
+			//log.Printf("received wrong message : %s", err)
+			log.Printf("verbose error info: %#v", err)
 			return
 		}
 
 		// Log message received to console
-		log.Printf("received message from host: %s", msg.Host)
+		log.Printf("received message from host: %s", msg.Host.Name)
 
 		metrics := pmetric.NewMetrics()
 		rm := metrics.ResourceMetrics().AppendEmpty()
-		rm.Resource().Attributes().PutStr("host", msg.Host)
+		rm.Resource().Attributes().PutStr("host", msg.Host.Name)
 
 		sm := rm.ScopeMetrics().AppendEmpty()
 		m := sm.Metrics().AppendEmpty()
-		m.SetName(msg.Key)
+		m.SetName(strconv.Itoa(int(msg.ItemID)))
 		dp := m.SetEmptyGauge().DataPoints().AppendEmpty()
 		dp.SetIntValue(parseInt(msg.Value))
-		dp.SetTimestamp(pcommon.Timestamp(time.Unix(msg.Timestamp, 0).UnixNano()))
+		dp.SetTimestamp(pcommon.Timestamp(time.Unix(int64(msg.Clock), 0).UnixNano()))
 
 		_ = zr.consumer.ConsumeMetrics(context.Background(), metrics)
 	}
