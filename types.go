@@ -18,6 +18,6 @@ type Metric struct {
 	Name     string    `json:"name"`
 	Clock    int64     `json:"clock"`
 	Ns       *int64    `json:"ns"`
-	Value    int64     `json:"value"`
+	Value    float64   `json:"value"`
 	Type     *int      `json:"type"`
 }

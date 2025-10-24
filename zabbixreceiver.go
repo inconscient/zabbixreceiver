@@ -62,56 +62,7 @@ func (zr *zabbixReceiver) Shutdown(_ context.Context) error {
 	return nil
 }
 
-func (zr *zabbixReceiver) handleConnection0(conn net.Conn) {
-	defer conn.Close()
-
-	// Read response
-	buffer := make([]byte, 1024)
-	n, err := conn.Read(buffer)
-	if err != nil {
-		log.Println("Error reading from connection:", err)
-		return
-	}
-
-	log.Println("Received Message:", string(buffer[:n]))
-
-	//decoder := json.NewDecoder(conn)
-
-	for {
-		var msg Metric
-		var data string = string(buffer[:n])
-		trimmedData := data[1 : len(data)-1] // Remove first and last characters
-
-		log.Printf("message trimmed: %s", trimmedData)
-
-		//if err := decoder.Decode(&msg); err != nil {
-		if err := json.Unmarshal([]byte(trimmedData), &msg); err != nil {
-			// Log message error
-			//log.Printf("received wrong message : %s", err)
-			log.Printf("verbose error info: %#v", err)
-			return
-		}
-
-		// Log message received to console
-		log.Printf("received message from host: %s", msg.Host)
-
-		metrics := pmetric.NewMetrics()
-		rm := metrics.ResourceMetrics().AppendEmpty()
-		rm.Resource().Attributes().PutStr("host", msg.Name)
-
-		sm := rm.ScopeMetrics().AppendEmpty()
-		m := sm.Metrics().AppendEmpty()
-		m.SetName(strconv.Itoa(int(msg.ItemID)))
-		dp := m.SetEmptyGauge().DataPoints().AppendEmpty()
-		dp.SetIntValue(msg.Value)
-		dp.SetTimestamp(pcommon.Timestamp(time.Unix(int64(msg.Clock), 0).UnixNano()))
-
-		_ = zr.consumer.ConsumeMetrics(context.Background(), metrics)
-	}
-}
-
 func (zr *zabbixReceiver) handleConnection(conn net.Conn) {
-	//defer conn.Close()
 
 	// Wrap the connection with a bufio.Reader
 	reader := bufio.NewReader(conn)
@@ -131,34 +82,30 @@ func (zr *zabbixReceiver) handleConnection(conn net.Conn) {
 	}
 	req.Body.Close() // Close the body after reading
 
-	//log.Printf("upper body: %s", body)
+	log.Printf("req body: %s", body)
 
 	for {
 		var msg Metric
-		var data string = string(body)
-		trimmedData := data[1 : len(data)-1] // Remove first and last characters
-		log.Printf("message trimmed: %s", trimmedData)
-		//if err := decoder.Decode(&msg); err != nil {
-		//if err := json.Unmarshal([]byte(body), &msg); err != nil {
+
 		if err := json.NewDecoder(strings.NewReader(string(body))).Decode(&msg); err != nil {
 			log.Printf("verbose error info: %#v", err)
 			return
 		}
 
 		// Log message received to console
-		//log.Printf("received message: %s", trimmedData)
+		//log.Printf("decoded message: %s", msg)
 
 		metrics := pmetric.NewMetrics()
 		rm := metrics.ResourceMetrics().AppendEmpty()
-		rm.Resource().Attributes().PutStr("host", msg.Name)
+		rm.Resource().Attributes().PutStr("host", msg.Host.Name)
 
 		sm := rm.ScopeMetrics().AppendEmpty()
 		m := sm.Metrics().AppendEmpty()
-		m.SetName(strconv.Itoa(int(msg.ItemID)))
+		m.SetName(msg.Name)
 		dp := m.SetEmptyGauge().DataPoints().AppendEmpty()
-		dp.SetIntValue(msg.Value)
+		dp.SetDoubleValue(msg.Value)
 		dp.SetTimestamp(pcommon.Timestamp(time.Unix(int64(msg.Clock), 0).UnixNano()))
-		log.Printf("Metrics Object: %s", rm.Resource().Attributes())
+		//log.Printf("Metrics Object: %s", rm.Resource().Attributes())
 		_ = zr.consumer.ConsumeMetrics(context.Background(), metrics)
 	}
 }
