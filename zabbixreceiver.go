@@ -1,11 +1,15 @@
 package zabbixreceiver
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
+	"io"
 	"log"
 	"net"
+	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"go.opentelemetry.io/collector/component"
@@ -58,7 +62,7 @@ func (zr *zabbixReceiver) Shutdown(_ context.Context) error {
 	return nil
 }
 
-func (zr *zabbixReceiver) handleConnection(conn net.Conn) {
+func (zr *zabbixReceiver) handleConnection0(conn net.Conn) {
 	defer conn.Close()
 
 	// Read response
@@ -75,11 +79,13 @@ func (zr *zabbixReceiver) handleConnection(conn net.Conn) {
 
 	for {
 		var msg Metric
-		var msgbd string = string(buffer[:n])
-		log.Printf("message: %s", msgbd)
+		var data string = string(buffer[:n])
+		trimmedData := data[1 : len(data)-1] // Remove first and last characters
+
+		log.Printf("message trimmed: %s", trimmedData)
 
 		//if err := decoder.Decode(&msg); err != nil {
-		if err := json.Unmarshal(buffer[:n], &msg); err != nil {
+		if err := json.Unmarshal([]byte(trimmedData), &msg); err != nil {
 			// Log message error
 			//log.Printf("received wrong message : %s", err)
 			log.Printf("verbose error info: %#v", err)
@@ -87,19 +93,72 @@ func (zr *zabbixReceiver) handleConnection(conn net.Conn) {
 		}
 
 		// Log message received to console
-		log.Printf("received message from host: %s", msg.Host.Name)
+		log.Printf("received message from host: %s", msg.Host)
 
 		metrics := pmetric.NewMetrics()
 		rm := metrics.ResourceMetrics().AppendEmpty()
-		rm.Resource().Attributes().PutStr("host", msg.Host.Name)
+		rm.Resource().Attributes().PutStr("host", msg.Name)
 
 		sm := rm.ScopeMetrics().AppendEmpty()
 		m := sm.Metrics().AppendEmpty()
 		m.SetName(strconv.Itoa(int(msg.ItemID)))
 		dp := m.SetEmptyGauge().DataPoints().AppendEmpty()
-		dp.SetIntValue(parseInt(msg.Value))
+		dp.SetIntValue(msg.Value)
 		dp.SetTimestamp(pcommon.Timestamp(time.Unix(int64(msg.Clock), 0).UnixNano()))
 
+		_ = zr.consumer.ConsumeMetrics(context.Background(), metrics)
+	}
+}
+
+func (zr *zabbixReceiver) handleConnection(conn net.Conn) {
+	//defer conn.Close()
+
+	// Wrap the connection with a bufio.Reader
+	reader := bufio.NewReader(conn)
+	// Parse the HTTP request
+	req, err := http.ReadRequest(reader)
+	if err != nil {
+		log.Println("Error reading request:", err)
+		return
+	}
+
+	// Read the body
+	body, err := io.ReadAll(req.Body)
+
+	if err != nil {
+		log.Println("Error reading body:", err)
+		return
+	}
+	req.Body.Close() // Close the body after reading
+
+	//log.Printf("upper body: %s", body)
+
+	for {
+		var msg Metric
+		var data string = string(body)
+		trimmedData := data[1 : len(data)-1] // Remove first and last characters
+		log.Printf("message trimmed: %s", trimmedData)
+		//if err := decoder.Decode(&msg); err != nil {
+		//if err := json.Unmarshal([]byte(body), &msg); err != nil {
+		if err := json.NewDecoder(strings.NewReader(string(body))).Decode(&msg); err != nil {
+			log.Printf("verbose error info: %#v", err)
+			return
+		}
+
+		// Log message received to console
+		//log.Printf("received message: %s", trimmedData)
+
+		metrics := pmetric.NewMetrics()
+		rm := metrics.ResourceMetrics().AppendEmpty()
+		rm.Resource().Attributes().PutStr("host", msg.Name)
+
+		sm := rm.ScopeMetrics().AppendEmpty()
+		m := sm.Metrics().AppendEmpty()
+		m.SetName(strconv.Itoa(int(msg.ItemID)))
+		dp := m.SetEmptyGauge().DataPoints().AppendEmpty()
+		dp.SetIntValue(msg.Value)
+		dp.SetTimestamp(pcommon.Timestamp(time.Unix(int64(msg.Clock), 0).UnixNano()))
+		log.Printf("Metrics Object: %s", rm.Resource().Attributes())
 		_ = zr.consumer.ConsumeMetrics(context.Background(), metrics)
 	}
 }

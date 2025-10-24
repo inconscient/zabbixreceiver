@@ -17,7 +17,7 @@ type Metric struct {
 	ItemID   int64     `json:"itemid"`
 	Name     string    `json:"name"`
 	Clock    int64     `json:"clock"`
-	Ns       int64     `json:"ns"`
-	Value    string    `json:"value"`
-	Type     int       `json:"type"`
+	Ns       *int64    `json:"ns"`
+	Value    int64     `json:"value"`
+	Type     *int      `json:"type"`
 }
