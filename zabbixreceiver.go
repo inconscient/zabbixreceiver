@@ -2,7 +2,6 @@ package zabbixreceiver
 
 import (
 	"context"
-	"encoding/json"
 	"log"
 	"net"
 	"strconv"
