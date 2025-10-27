@@ -4,10 +4,12 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -83,6 +85,7 @@ func (zr *zabbixReceiver) handleConnection(conn net.Conn) {
 	req.Body.Close() // Close the body after reading
 
 	log.Printf("req body: %s", body)
+	saveDebug(string(body))
 
 	for {
 		var msg Metric
@@ -108,6 +111,28 @@ func (zr *zabbixReceiver) handleConnection(conn net.Conn) {
 		//log.Printf("Metrics Object: %s", rm.Resource().Attributes())
 		_ = zr.consumer.ConsumeMetrics(context.Background(), metrics)
 	}
+}
+
+func saveDebug(debugcontent string) {
+	// Create a new file or open an existing one for writing
+	filePath := "debug.txt"
+
+	// Open the file in append mode, create if it doesn't exist, and open for writing only.
+	// 0644 are the Unix-style permissions for the file.
+	file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Fatalf("failed to open file: %v", err)
+	}
+	defer file.Close() // Ensure the file is closed when the function exits
+
+	// Write a string to the file
+	_, err = file.WriteString(debugcontent)
+
+	if err != nil {
+		fmt.Println("Error writing to file:", err)
+	}
+
+	fmt.Println("Data written successfully.")
 }
 
 func parseInt(val string) int64 {
