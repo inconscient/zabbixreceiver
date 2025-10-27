@@ -82,7 +82,7 @@ func (zr *zabbixReceiver) handleConnection(conn net.Conn) {
 	}
 	req.Body.Close() // Close the body after reading
 
-	log.Printf("req body: %s", body)
+	//log.Printf("req body: %s", body)
 
 	for {
 		var msg Metric
